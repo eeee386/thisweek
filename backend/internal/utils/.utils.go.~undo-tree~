@@ -1,0 +1,12 @@
+(undo-tree-save-format-version . 1)
+"ec76af0e5e8da63f05b5382d8f77f606763b60d4"
+[nil nil nil nil (25935 43547 63804 714000) 0 nil]
+([nil nil ((1 . 14) (t 25935 43501 962765 435000)) nil (25935 43547 63803 11000) 0 nil])
+([nil nil ((apply yas--snippet-revive 9 14 #s(yas--snippet nil nil nil 4 nil nil nil nil)) (apply yas--take-care-of-redo #s(yas--snippet nil nil nil 4 nil nil nil nil)) (9 . 14) (#("utils" 0 5 (fontified nil)) . 9) (9 . 14) (#("utils" 0 5 (fontified nil)) . 9) (9 . 14) (#("utils" 0 5 (fontified t)) . -9) (undo-tree-id0 . -5) (undo-tree-id1 . -5) 14) nil (25935 43547 63800 817000) 0 nil])
+([nil nil ((14 . 16)) nil (25935 43547 63749 571000) 0 nil])
+([nil nil ((nil rear-nonsticky nil 16 . 17) (#("
+" 0 1 (fontified nil)) . -766) (16 . 767)) nil (25935 43547 63748 258000) 0 nil])
+([nil nil ((#("
+" 0 1 (fontified t rear-nonsticky t)) . 16)) nil (25935 43547 63746 325000) 0 nil])
+([nil current ((765 . 766)) nil (25935 43547 63740 514000) 0 nil])
+nil
