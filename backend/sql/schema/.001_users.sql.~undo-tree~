@@ -1,18 +1,33 @@
 (undo-tree-save-format-version . 1)
-"1eab6f56aaac50560cada582abcd0e72544db5f5"
+"6c3d0b4a0655c4cdb41f8c2386a3b8b238085987"
 [nil nil nil nil (25935 44197 796864 534000) 0 nil]
 ([nil nil ((nil rear-nonsticky nil 1 . 2) (#("
 " 0 1 (fontified nil)) . -179) (1 . 180) (t 25935 44178 258864 343000)) nil (25935 44197 796862 621000) 0 nil])
 ([nil nil ((179 . 180)) nil (25935 44197 796856 299000) 0 nil])
-([nil nil ((121 . 123) (#(" " 0 1 (fontified nil face tree-sitter-hl-face:punctuation\.delimiter)) . 120) (120 . 121) (120 . 121) (t 25935 44197 897602 99000)) nil (25935 44306 343000 589000) 0 nil])
+([nil nil ((121 . 123) (#(" " 0 1 (face tree-sitter-hl-face:punctuation\.delimiter fontified nil)) . 120) (120 . 121) (120 . 121) (t 25935 44197 897602 99000)) nil (25935 44306 343000 589000) 0 nil])
 ([nil nil ((#(" " 0 1 (fontified t)) . -122) (undo-tree-id1 . -1) 123) nil (25935 44306 342999 66000) 0 nil])
 ([nil nil ((122 . 131)) nil (25935 44306 342997 72000) 0 nil])
 ([nil nil ((#("R" 0 1 (fontified t)) . -130) (undo-tree-id0 . -1) 131) nil (25935 44306 342995 940000) 0 nil])
 ([nil nil ((130 . 137)) nil (25935 44306 342963 149000) 0 nil])
-([nil nil ((#(")" 0 1 (fontified nil)) . -137) (137 . 138) (#(")" 0 1 (fontified nil face tree-sitter-hl-face:punctuation\.bracket)) . -137) (137 . 138) (136 . 138)) nil (25935 44306 342961 766000) 0 nil])
+([nil nil ((#(")" 0 1 (fontified nil)) . -137) (137 . 138) (#(")" 0 1 (face tree-sitter-hl-face:punctuation\.bracket fontified nil)) . -137) (137 . 138) (136 . 138)) nil (25935 44306 342961 766000) 0 nil])
 ([nil nil ((137 . 139)) nil (25935 44306 342959 863000) 0 nil])
 ([nil nil ((140 . 144)) nil (25935 44306 342958 139000) 0 nil])
 ([nil nil ((144 . 156)) nil (25935 44306 342956 877000) 0 nil])
 ([nil nil ((156 . 165)) nil (25935 44306 342955 454000) 0 nil])
-([nil current ((nil rear-nonsticky nil 208 . 209) (nil fontified nil 165 . 209) (165 . 209) 164) nil (25935 44306 342948 421000) 0 nil])
+([nil nil ((nil rear-nonsticky nil 208 . 209) (nil fontified nil 165 . 209) (165 . 209) 164) nil (25935 44306 342948 421000) 0 nil])
+([nil nil ((#(" apiKey VARCHAR(64) UNIQUE NOT NULL DEFAULT encode(sha256(random()::text::bytea), 'hex'),
+" 0 8 (fontified t) 8 15 (fontified t face tree-sitter-hl-face:type\.builtin) 15 16 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 16 18 (fontified t face (tree-sitter-hl-face:string tree-sitter-hl-face:number)) 18 19 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 19 20 (fontified t) 20 26 (fontified t face font-lock-keyword-face) 26 27 (fontified t) 27 30 (fontified t face font-lock-keyword-face) 30 31 (fontified t) 31 35 (fontified t face tree-sitter-hl-face:type\.builtin) 35 36 (fontified t) 36 43 (fontified t face tree-sitter-hl-face:attribute) 43 44 (fontified t) 44 50 (fontified t face (tree-sitter-hl-face:function\.call tree-sitter-hl-face:type)) 50 51 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 51 57 (fontified t face (tree-sitter-hl-face:function\.call tree-sitter-hl-face:type)) 57 58 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 58 64 (fontified t face (tree-sitter-hl-face:function\.call tree-sitter-hl-face:type)) 64 65 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 65 66 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 66 68 (fontified t) 68 72 (fontified t face tree-sitter-hl-face:type\.builtin) 72 74 (fontified t) 74 79 (fontified t face tree-sitter-hl-face:type\.builtin) 79 80 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 80 81 (fontified t face tree-sitter-hl-face:punctuation\.delimiter) 81 82 (fontified t) 82 87 (fontified t face (tree-sitter-hl-face:string tree-sitter-hl-face:number)) 87 88 (fontified t face tree-sitter-hl-face:punctuation\.bracket) 88 89 (fontified t face tree-sitter-hl-face:punctuation\.delimiter) 89 90 (fontified t)) . 121) (undo-tree-id16 . 90) (undo-tree-id17 . -89) (t 25935 44306 444133 860000)) nil (25937 7829 927332 866000) 0 nil])
+([nil nil ((#("n" 0 1 (fontified t)) . -122) (undo-tree-id12 . -1) (#("a" 0 1 (fontified t)) . -123) (undo-tree-id13 . -1) (#("m" 0 1 (fontified t)) . -124) (undo-tree-id14 . -1) (#("e" 0 1 (fontified t face font-lock-keyword-face)) . -125) (undo-tree-id15 . -1) 126) nil (25937 7829 927331 12000) 0 nil])
+([nil nil ((122 . 127)) nil (25937 7829 927328 798000) 0 nil])
+([nil nil ((#("E" 0 1 (fontified t)) . -122) (undo-tree-id11 . -1) 123) nil (25937 7829 927328 77000) 0 nil])
+([nil nil ((122 . 123)) nil (25937 7829 927326 824000) 0 nil])
+([nil nil ((142 . 144) (#("  " 0 2 (fontified nil face tree-sitter-hl-face:type\.builtin)) . 141) (141 . 143) (141 . 142)) nil (25937 7829 927325 782000) 0 nil])
+([nil nil ((141 . 142)) nil (25937 7829 927324 570000) 0 nil])
+([nil nil ((144 . 148)) nil (25937 7829 927324 129000) 0 nil])
+([nil nil ((148 . 158)) nil (25937 7829 927323 538000) 0 nil])
+([nil nil ((#("e" 0 1 (fontified t)) . -154) (undo-tree-id7 . -1) (#("x" 0 1 (fontified t)) . -155) (undo-tree-id8 . -1) (#("t" 0 1 (fontified t face tree-sitter-hl-face:type\.builtin)) . -156) (undo-tree-id9 . -1) (#(" " 0 1 (fontified t)) . -157) (undo-tree-id10 . -1) 158) nil (25937 7829 927322 546000) 0 nil])
+([nil nil ((154 . 167)) nil (25937 7829 927320 11000) 0 nil])
+([nil nil ((168 . 170) (#("  " 0 2 (fontified nil face tree-sitter-hl-face:punctuation\.delimiter)) . 167) (167 . 169) (167 . 168)) nil (25937 7829 927319 80000) 0 nil])
+([nil current ((#("
+" 0 1 (fontified t)) . -167) (undo-tree-id0 . -1) (undo-tree-id1 . -1) (undo-tree-id2 . -1) (undo-tree-id3 . -1) (undo-tree-id4 . -1) (#(" " 0 1 (fontified t)) . -168) (undo-tree-id5 . -1) (undo-tree-id6 . -1) 169) nil (25937 7829 927315 753000) 0 nil])
 nil
