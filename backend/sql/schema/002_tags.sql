@@ -6,7 +6,7 @@
   updated_AT TIMESTAMP NOT NULL,
   CONSTRAINT userID
   FOREIGN KEY(user_id) REFERENCES users(id)
-  ON DELETE CASCADE,
+  ON DELETE CASCADE
 );
 
 -- +goose Down
