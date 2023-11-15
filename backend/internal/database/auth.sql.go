@@ -7,28 +7,36 @@ package database
 
 import (
 	"context"
+	"time"
 )
 
 const addRefreshToken = `-- name: AddRefreshToken :one
-INSERT INTO auth(id)
-VALUES ($1)
-RETURNING id
+INSERT INTO auth(id, issued_at)
+VALUES ($1, $2)
+RETURNING id, issued_at
 `
 
-func (q *Queries) AddRefreshToken(ctx context.Context, id string) (string, error) {
-	row := q.db.QueryRowContext(ctx, addRefreshToken, id)
-	err := row.Scan(&id)
-	return id, err
+type AddRefreshTokenParams struct {
+	ID       string    `json:"id"`
+	IssuedAt time.Time `json:"issued_at"`
+}
+
+func (q *Queries) AddRefreshToken(ctx context.Context, arg AddRefreshTokenParams) (Auth, error) {
+	row := q.db.QueryRowContext(ctx, addRefreshToken, arg.ID, arg.IssuedAt)
+	var i Auth
+	err := row.Scan(&i.ID, &i.IssuedAt)
+	return i, err
 }
 
 const getRefreshToken = `-- name: GetRefreshToken :one
-SELECT id FROM auth WHERE id=$1
+SELECT id, issued_at FROM auth WHERE id=$1
 `
 
-func (q *Queries) GetRefreshToken(ctx context.Context, id string) (string, error) {
+func (q *Queries) GetRefreshToken(ctx context.Context, id string) (Auth, error) {
 	row := q.db.QueryRowContext(ctx, getRefreshToken, id)
-	err := row.Scan(&id)
-	return id, err
+	var i Auth
+	err := row.Scan(&i.ID, &i.IssuedAt)
+	return i, err
 }
 
 const revokeRefreshToken = `-- name: RevokeRefreshToken :exec

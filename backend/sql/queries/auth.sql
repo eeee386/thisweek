@@ -1,6 +1,6 @@
 -- name: AddRefreshToken :one
-INSERT INTO auth(id)
-VALUES ($1)
+INSERT INTO auth(id, issued_at)
+VALUES ($1, $2)
 RETURNING *;
 
 -- name: GetRefreshToken :one

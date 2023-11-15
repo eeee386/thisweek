@@ -57,7 +57,8 @@ func (ns NullRepetitionTypes) Value() (driver.Value, error) {
 }
 
 type Auth struct {
-	ID string `json:"id"`
+	ID       string    `json:"id"`
+	IssuedAt time.Time `json:"issued_at"`
 }
 
 type Dailytask struct {

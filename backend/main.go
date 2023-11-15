@@ -18,9 +18,22 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
-	"github.com/x/crypto/bcrypt"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/sha3"
 )
+
+func sha3Hash(input string) string {
+
+	// Create a new hash & write input string
+	hash := sha3.New256()
+	_, _ = hash.Write([]byte(input))
+
+	// Get the resulting encoded byte slice
+	sha3 := hash.Sum(nil)
+
+	// Convert the encoded byte slice to a string
+	return fmt.Sprintf("%x", sha3)
+}
 
 func readinessHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithJSON(w, 200, struct {
@@ -63,7 +76,7 @@ func (a apiConfig) registerHandler(w http.ResponseWriter, r *http.Request) {
 	createUserObject.CreatedAt = timestamp
 	createUserObject.UpdatedAt = timestamp
 	pass, perr := bcrypt.GenerateFromPassword([]byte(createUserObject.Password), 8)
-	createUserObject.Password = pass
+	createUserObject.Password = fmt.Sprintf("%x", pass)
 	if perr != nil {
 		utils.RespondWithError(w, 500, "Internal Server Error")
 	}
@@ -91,7 +104,11 @@ func (a apiConfig) mintToken(id string, issuer string, expiresInSeconds int) (st
 func (a apiConfig) mintRefreshToken(id string) (string, error) {
 	tokenString, err := a.mintToken(id, "thisweek-refresh", 5184000)
 	if err == nil {
-
+		godotenv.Load()
+		refreshObject := database.AddRefreshTokenParams{}
+		refreshObject.IssuedAt = time.Now()
+		refreshObject.ID = sha3Hash(tokenString)
+		a.DB.AddRefreshToken(a.ctx, refreshObject)
 	}
 	return tokenString, err
 }
@@ -111,11 +128,12 @@ type LoginReqUser struct {
 }
 
 type LoginResUser struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 func (a apiConfig) login(w http.ResponseWriter, r *http.Request) {
@@ -127,10 +145,21 @@ func (a apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := a.DB.GetUserByEmail(a.ctx, userReqParams.Email)
 	resUser := LoginResUser{}
+	token, terr := a.mintAccessToken(user.ID.String())
+	if terr != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	refreshToken, cerr := a.mintRefreshToken(user.ID.String())
+	if cerr != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+	}
+	resUser.AccessToken = token
 	resUser.CreatedAt = user.CreatedAt
 	resUser.UpdatedAt = user.UpdatedAt
 	resUser.Email = user.Email
 	resUser.ID = user.ID
+	resUser.RefreshToken = refreshToken
 	// Handle user or database error
 	if err != nil {
 		utils.RespondWithError(w, 401, "Unauthorized")
