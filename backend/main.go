@@ -19,21 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/crypto/sha3"
 )
-
-func sha3Hash(input string) string {
-
-	// Create a new hash & write input string
-	hash := sha3.New256()
-	_, _ = hash.Write([]byte(input))
-
-	// Get the resulting encoded byte slice
-	sha3 := hash.Sum(nil)
-
-	// Convert the encoded byte slice to a string
-	return fmt.Sprintf("%x", sha3)
-}
 
 func readinessHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithJSON(w, 200, struct {
@@ -45,12 +31,19 @@ func errorHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithError(w, 500, "Internal Server Error")
 }
 
+// If no change will happen on this -> make a DB wrapper out of this
+// If a change were to happen break the db related sutff to a different struct
+// I don't auth to depend on server api config
 type apiConfig struct {
 	DB  *database.Queries
 	ctx context.Context
 }
 
+const AccessTokenIssuer = "thisweek-access"
+const RefreshTokenIssuer = "thisweek-refresh"
+
 type authedHandler func(http.ResponseWriter, *http.Request, database.User)
+
 
 func (a *apiConfig) authenticate(handler authedHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -61,11 +54,25 @@ func (a *apiConfig) authenticate(handler authedHandler) http.HandlerFunc {
 			jwtSecret := os.Getenv("JWT_SECRET")
 			return []byte(jwtSecret), nil
 		})
-
+		if err != nil || !token.Valid || claims.Issuer != AccessTokenIssuer {
+			utils.RespondWithError(w, 401, "Unauthorized")
+			return
+		}
+		userId, perr := uuid.Parse(claims.Subject)
+		if perr != nil {
+			utils.RespondWithError(w, 401, "Unauthorized")
+			return
+		}
+		user, derr := a.DB.GetUserById(a.ctx, userId)
+		if derr != nil {
+			utils.RespondWithError(w, 401, "Unauthorized")
+			return
+		}
+		handler(w, r, user)
 	}
 }
 
-func (a apiConfig) registerHandler(w http.ResponseWriter, r *http.Request) {
+func (a *apiConfig) registerHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	createUserObject := database.CreateUserParams{}
 	if err := decoder.Decode(&createUserObject); err != nil {
@@ -89,7 +96,7 @@ func (a apiConfig) registerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a apiConfig) mintToken(id string, issuer string, expiresInSeconds int) (string, error) {
+func (a *apiConfig) mintToken(id string, issuer string, expiresInSeconds int) (string, error) {
 	godotenv.Load()
 	jwtSecret := os.Getenv("JWT_SECRET")
 	claims := jwt.RegisteredClaims{}
@@ -101,20 +108,79 @@ func (a apiConfig) mintToken(id string, issuer string, expiresInSeconds int) (st
 	return token.SignedString([]byte(jwtSecret))
 }
 
-func (a apiConfig) mintRefreshToken(id string) (string, error) {
-	tokenString, err := a.mintToken(id, "thisweek-refresh", 5184000)
+func (a *apiConfig) mintRefreshToken(id string) (string, error) {
+	tokenString, err := a.mintToken(id, RefreshTokenIssuer, 5184000)
 	if err == nil {
 		godotenv.Load()
 		refreshObject := database.AddRefreshTokenParams{}
 		refreshObject.IssuedAt = time.Now()
-		refreshObject.ID = sha3Hash(tokenString)
+		refreshObject.ID = tokenString
 		a.DB.AddRefreshToken(a.ctx, refreshObject)
 	}
 	return tokenString, err
 }
 
-func (a apiConfig) mintAccessToken(id string) (string, error) {
+func (a *apiConfig) mintAccessToken(id string) (string, error) {
 	return a.mintToken(id, "thisweek-access", 86400)
+}
+
+type TokenOperationType struct {
+	token string
+}
+
+func (a *apiConfig) revokeTokens(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		refreshTokenObj := TokenOperationType{}
+		if err := decoder.Decode(&refreshTokenObj); err != nil {
+			utils.RespondWithError(w, 400, "Bad request")
+			return
+		}
+		derr := a.DB.RevokeRefreshToken(a.ctx, refreshTokenObj.token)
+		// TODO: handle not found as not an error
+		if derr != nil {
+			utils.RespondWithError(w, 500, "Internal Server Error")
+			return
+		}
+		utils.RespondWithJSON(w, 200, "OK")
+	}
+}
+
+func (a *apiConfig) refreshAccessToken(w http.ResponseWriter, r *http.Request, user database.User) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		refreshTokenObj := TokenOperationType{}
+		if err := decoder.Decode(&refreshTokenObj); err != nil {
+			utils.RespondWithError(w, 400, "Bad request")
+			return
+		}
+		tokenString, derr := a.DB.GetRefreshToken(a.ctx, refreshTokenObj.token)
+		if derr != nil {
+			utils.RespondWithError(w, 404, "Not Found")
+			return
+		}
+		
+		claims := jwt.RegisteredClaims{}
+		token, err := jwt.ParseWithClaims(tokenString.ID, &claims, func(token *jwt.Token) (interface{}, error) {
+			jwtSecret := os.Getenv("JWT_SECRET")
+			return []byte(jwtSecret), nil
+		})
+		if err != nil || !token.Valid || claims.Issuer != AccessTokenIssuer {
+			utils.RespondWithError(w, 401, "Unauthorized")
+			return
+		}
+		
+		newAccessToken, terr := a.mintAccessToken(user.ID.String())
+		if terr != nil {
+			utils.RespondWithError(w, 500, "Internal Server Error")
+			return
+		}
+		newAccessTokenObj := TokenOperationType{
+			token: newAccessToken,
+		}
+		utils.RespondWithJSON(w, 200, newAccessTokenObj)
+		return
+	}
 }
 
 type AuthenticatedUser struct {
@@ -136,7 +202,7 @@ type LoginResUser struct {
 	RefreshToken string    `json:"refresh_token"`
 }
 
-func (a apiConfig) login(w http.ResponseWriter, r *http.Request) {
+func (a *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	userReqParams := LoginReqUser{}
 	if err := decoder.Decode(&userReqParams); err != nil {
@@ -169,7 +235,6 @@ func (a apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithJSON(w, 200, user)
 	}
 	utils.RespondWithJSON(w, 200, user)
-
 }
 
 func main() {
@@ -203,7 +268,7 @@ func main() {
 	v1Router.Get("/readiness", readinessHandler)
 	v1Router.Get("/err", errorHandler)
 
-	v1Router.Post("/register", registerHandler)
+	v1Router.Post("/register", apiCfg.registerHandler)
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", port), r)
 	fmt.Println(err)
