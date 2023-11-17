@@ -4,7 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"thisweek/backend/internal/database"
+	"context"
 )
+
+
+type DBConfig struct {
+	DB  *database.Queries
+	ctx context.Context
+}
 
 type ErrorResponse struct {
 	Error string `json:"error"`

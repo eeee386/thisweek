@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
+	"thisweek/backend/internal/auth"
 	"thisweek/backend/internal/database"
 	"thisweek/backend/internal/utils"
 	"time"
@@ -31,104 +31,52 @@ func errorHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithError(w, 500, "Internal Server Error")
 }
 
-// If no change will happen on this -> make a DB wrapper out of this
-// If a change were to happen break the db related sutff to a different struct
-// I don't auth to depend on server api config
-type apiConfig struct {
-	DB  *database.Queries
-	ctx context.Context
-}
+type authedHandler func(*utils.DBConfig, http.ResponseWriter, *http.Request, database.User)
 
-const AccessTokenIssuer = "thisweek-access"
-const RefreshTokenIssuer = "thisweek-refresh"
-
-type authedHandler func(http.ResponseWriter, *http.Request, database.User)
-
-
-func (a *apiConfig) authenticate(handler authedHandler) http.HandlerFunc {
+func authenticate(a *utils.DBConfig, handler authedHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bearerToken := r.Header.Get("Authorization")
-		jwtToken := strings.Split(bearerToken, " ")[1]
-		claims := jwt.RegisteredClaims{}
-		token, err := jwt.ParseWithClaims(jwtToken, &claims, func(token *jwt.Token) (interface{}, error) {
-			jwtSecret := os.Getenv("JWT_SECRET")
-			return []byte(jwtSecret), nil
-		})
-		if err != nil || !token.Valid || claims.Issuer != AccessTokenIssuer {
+		user, err := auth.ValidateBearerToken(a, bearerToken)
+		// Handle error with database
+		if err != nil {
 			utils.RespondWithError(w, 401, "Unauthorized")
+		} else {
+			handler(a, w, r, user)
+		}
+	}
+}
+
+func registerHandler(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		createUserObject := database.CreateUserParams{}
+		if err := decoder.Decode(&createUserObject); err != nil {
+			utils.RespondWithError(w, 400, "Bad request")
 			return
 		}
-		userId, perr := uuid.Parse(claims.Subject)
+		timestamp := time.Now()
+		createUserObject.CreatedAt = timestamp
+		createUserObject.UpdatedAt = timestamp
+		pass, perr := bcrypt.GenerateFromPassword([]byte(createUserObject.Password), 8)
+		createUserObject.Password = fmt.Sprintf("%x", pass)
 		if perr != nil {
-			utils.RespondWithError(w, 401, "Unauthorized")
-			return
+			utils.RespondWithError(w, 500, "Internal Server Error")
 		}
-		user, derr := a.DB.GetUserById(a.ctx, userId)
-		if derr != nil {
-			utils.RespondWithError(w, 401, "Unauthorized")
-			return
+		user, err := a.DB.CreateUser(a.CTX, createUserObject)
+		// check error if it is a database one (500) or client error (400)
+		if err != nil {
+			utils.RespondWithError(w, 400, "Bad request")
+		} else {
+			utils.RespondWithJSON(w, 200, user)
 		}
-		handler(w, r, user)
 	}
-}
-
-func (a *apiConfig) registerHandler(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	createUserObject := database.CreateUserParams{}
-	if err := decoder.Decode(&createUserObject); err != nil {
-		utils.RespondWithError(w, 400, "Bad request")
-		return
-	}
-	timestamp := time.Now()
-	createUserObject.CreatedAt = timestamp
-	createUserObject.UpdatedAt = timestamp
-	pass, perr := bcrypt.GenerateFromPassword([]byte(createUserObject.Password), 8)
-	createUserObject.Password = fmt.Sprintf("%x", pass)
-	if perr != nil {
-		utils.RespondWithError(w, 500, "Internal Server Error")
-	}
-	user, err := a.DB.CreateUser(a.ctx, createUserObject)
-	// check error if it is a database one (500) or client error (400)
-	if err != nil {
-		utils.RespondWithError(w, 400, "Bad request")
-	} else {
-		utils.RespondWithJSON(w, 200, user)
-	}
-}
-
-func (a *apiConfig) mintToken(id string, issuer string, expiresInSeconds int) (string, error) {
-	godotenv.Load()
-	jwtSecret := os.Getenv("JWT_SECRET")
-	claims := jwt.RegisteredClaims{}
-	claims.Issuer = issuer
-	claims.IssuedAt = jwt.NewNumericDate(time.Now().UTC())
-	claims.ExpiresAt = jwt.NewNumericDate(claims.IssuedAt.Add(time.Second * time.Duration(expiresInSeconds)))
-	claims.Subject = id
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(jwtSecret))
-}
-
-func (a *apiConfig) mintRefreshToken(id string) (string, error) {
-	tokenString, err := a.mintToken(id, RefreshTokenIssuer, 5184000)
-	if err == nil {
-		godotenv.Load()
-		refreshObject := database.AddRefreshTokenParams{}
-		refreshObject.IssuedAt = time.Now()
-		refreshObject.ID = tokenString
-		a.DB.AddRefreshToken(a.ctx, refreshObject)
-	}
-	return tokenString, err
-}
-
-func (a *apiConfig) mintAccessToken(id string) (string, error) {
-	return a.mintToken(id, "thisweek-access", 86400)
 }
 
 type TokenOperationType struct {
 	token string
 }
 
-func (a *apiConfig) revokeTokens(w http.ResponseWriter, r *http.Request) {
+func revokeTokens(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(r.Body)
 		refreshTokenObj := TokenOperationType{}
@@ -136,9 +84,8 @@ func (a *apiConfig) revokeTokens(w http.ResponseWriter, r *http.Request) {
 			utils.RespondWithError(w, 400, "Bad request")
 			return
 		}
-		derr := a.DB.RevokeRefreshToken(a.ctx, refreshTokenObj.token)
-		// TODO: handle not found as not an error
-		if derr != nil {
+		if derr := a.DB.RevokeRefreshToken(a.CTX, refreshTokenObj.token); derr != nil {
+			// TODO: handle not found as not an error
 			utils.RespondWithError(w, 500, "Internal Server Error")
 			return
 		}
@@ -146,41 +93,39 @@ func (a *apiConfig) revokeTokens(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *apiConfig) refreshAccessToken(w http.ResponseWriter, r *http.Request, user database.User) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		decoder := json.NewDecoder(r.Body)
-		refreshTokenObj := TokenOperationType{}
-		if err := decoder.Decode(&refreshTokenObj); err != nil {
-			utils.RespondWithError(w, 400, "Bad request")
-			return
-		}
-		tokenString, derr := a.DB.GetRefreshToken(a.ctx, refreshTokenObj.token)
-		if derr != nil {
-			utils.RespondWithError(w, 404, "Not Found")
-			return
-		}
-		
-		claims := jwt.RegisteredClaims{}
-		token, err := jwt.ParseWithClaims(tokenString.ID, &claims, func(token *jwt.Token) (interface{}, error) {
-			jwtSecret := os.Getenv("JWT_SECRET")
-			return []byte(jwtSecret), nil
-		})
-		if err != nil || !token.Valid || claims.Issuer != AccessTokenIssuer {
-			utils.RespondWithError(w, 401, "Unauthorized")
-			return
-		}
-		
-		newAccessToken, terr := a.mintAccessToken(user.ID.String())
-		if terr != nil {
-			utils.RespondWithError(w, 500, "Internal Server Error")
-			return
-		}
-		newAccessTokenObj := TokenOperationType{
-			token: newAccessToken,
-		}
-		utils.RespondWithJSON(w, 200, newAccessTokenObj)
+func refreshAccessToken(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user database.User) {
+	decoder := json.NewDecoder(r.Body)
+	refreshTokenObj := TokenOperationType{}
+	if err := decoder.Decode(&refreshTokenObj); err != nil {
+		utils.RespondWithError(w, 400, "Bad request")
 		return
 	}
+	tokenString, derr := a.DB.GetRefreshToken(a.CTX, refreshTokenObj.token)
+	if derr != nil {
+		utils.RespondWithError(w, 404, "Not Found")
+		return
+	}
+
+	claims := jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(tokenString.ID, &claims, func(token *jwt.Token) (interface{}, error) {
+		jwtSecret := os.Getenv("JWT_SECRET")
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid || claims.Issuer != auth.RefreshTokenIssuer {
+		utils.RespondWithError(w, 401, "Unauthorized")
+		return
+	}
+
+	newAccessToken, terr := auth.MintAccessToken(a, user.ID.String())
+	if terr != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	newAccessTokenObj := TokenOperationType{
+		token: newAccessToken,
+	}
+	utils.RespondWithJSON(w, 200, newAccessTokenObj)
+	return
 }
 
 type AuthenticatedUser struct {
@@ -202,39 +147,41 @@ type LoginResUser struct {
 	RefreshToken string    `json:"refresh_token"`
 }
 
-func (a *apiConfig) login(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	userReqParams := LoginReqUser{}
-	if err := decoder.Decode(&userReqParams); err != nil {
-		utils.RespondWithError(w, 400, "Bad Request")
-		return
-	}
-	user, err := a.DB.GetUserByEmail(a.ctx, userReqParams.Email)
-	resUser := LoginResUser{}
-	token, terr := a.mintAccessToken(user.ID.String())
-	if terr != nil {
-		utils.RespondWithError(w, 500, "Internal Server Error")
-		return
-	}
-	refreshToken, cerr := a.mintRefreshToken(user.ID.String())
-	if cerr != nil {
-		utils.RespondWithError(w, 500, "Internal Server Error")
-	}
-	resUser.AccessToken = token
-	resUser.CreatedAt = user.CreatedAt
-	resUser.UpdatedAt = user.UpdatedAt
-	resUser.Email = user.Email
-	resUser.ID = user.ID
-	resUser.RefreshToken = refreshToken
-	// Handle user or database error
-	if err != nil {
-		utils.RespondWithError(w, 401, "Unauthorized")
-		return
-	}
-	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userReqParams.Password)) == nil {
+func login(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		userReqParams := LoginReqUser{}
+		if err := decoder.Decode(&userReqParams); err != nil {
+			utils.RespondWithError(w, 400, "Bad Request")
+			return
+		}
+		user, err := a.DB.GetUserByEmail(a.CTX, userReqParams.Email)
+		resUser := LoginResUser{}
+		token, terr := auth.MintAccessToken(a, user.ID.String())
+		if terr != nil {
+			utils.RespondWithError(w, 500, "Internal Server Error")
+			return
+		}
+		refreshToken, cerr := auth.MintRefreshToken(a, user.ID.String())
+		if cerr != nil {
+			utils.RespondWithError(w, 500, "Internal Server Error")
+		}
+		resUser.AccessToken = token
+		resUser.CreatedAt = user.CreatedAt
+		resUser.UpdatedAt = user.UpdatedAt
+		resUser.Email = user.Email
+		resUser.ID = user.ID
+		resUser.RefreshToken = refreshToken
+		// Handle user or database error
+		if err != nil {
+			utils.RespondWithError(w, 401, "Unauthorized")
+			return
+		}
+		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userReqParams.Password)) == nil {
+			utils.RespondWithJSON(w, 200, user)
+		}
 		utils.RespondWithJSON(w, 200, user)
 	}
-	utils.RespondWithJSON(w, 200, user)
 }
 
 func main() {
@@ -249,10 +196,10 @@ func main() {
 	}
 
 	dbQueries := database.New(db)
-	apiCfg := apiConfig{}
+	apiCfg := utils.DBConfig{}
 	apiCfg.DB = dbQueries
 
-	apiCfg.ctx = context.Background()
+	apiCfg.CTX = context.Background()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -268,7 +215,10 @@ func main() {
 	v1Router.Get("/readiness", readinessHandler)
 	v1Router.Get("/err", errorHandler)
 
-	v1Router.Post("/register", apiCfg.registerHandler)
+	v1Router.Post("/register", registerHandler(&apiCfg))
+	v1Router.Post("/login", login(&apiCfg))
+	v1Router.Post("/revokeAccessToken", revokeTokens(&apiCfg))
+	v1Router.Post("/refreshAccessToken", authenticate(&apiCfg, refreshAccessToken))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", port), r)
 	fmt.Println(err)
