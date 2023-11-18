@@ -10,15 +10,12 @@ import (
 	"thisweek/backend/internal/auth"
 	"thisweek/backend/internal/database"
 	"thisweek/backend/internal/utils"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func readinessHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,28 +43,21 @@ func authenticate(a *utils.DBConfig, handler authedHandler) http.HandlerFunc {
 	}
 }
 
+
 func registerHandler(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(r.Body)
-		createUserObject := database.CreateUserParams{}
-		if err := decoder.Decode(&createUserObject); err != nil {
+		registerReq := auth.RegisterReq{}
+		if err := decoder.Decode(&registerReq); err != nil {
 			utils.RespondWithError(w, 400, "Bad request")
 			return
 		}
-		timestamp := time.Now()
-		createUserObject.CreatedAt = timestamp
-		createUserObject.UpdatedAt = timestamp
-		pass, perr := bcrypt.GenerateFromPassword([]byte(createUserObject.Password), 8)
-		createUserObject.Password = fmt.Sprintf("%x", pass)
-		if perr != nil {
-			utils.RespondWithError(w, 500, "Internal Server Error")
-		}
-		user, err := a.DB.CreateUser(a.CTX, createUserObject)
+		registerUserRes, err := auth.CreateNewUser(a, &registerReq)
 		// check error if it is a database one (500) or client error (400)
 		if err != nil {
 			utils.RespondWithError(w, 400, "Bad request")
 		} else {
-			utils.RespondWithJSON(w, 200, user)
+			utils.RespondWithJSON(w, 200, registerUserRes)
 		}
 	}
 }
@@ -133,54 +123,21 @@ type AuthenticatedUser struct {
 	token string
 }
 
-type LoginReqUser struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type LoginResUser struct {
-	ID           uuid.UUID `json:"id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Email        string    `json:"email"`
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-}
-
 func login(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(r.Body)
-		userReqParams := LoginReqUser{}
+		userReqParams := auth.LoginReqUser{}
 		if err := decoder.Decode(&userReqParams); err != nil {
 			utils.RespondWithError(w, 400, "Bad Request")
 			return
 		}
-		user, err := a.DB.GetUserByEmail(a.CTX, userReqParams.Email)
-		resUser := LoginResUser{}
-		token, terr := auth.MintAccessToken(a, user.ID.String())
-		if terr != nil {
-			utils.RespondWithError(w, 500, "Internal Server Error")
-			return
-		}
-		refreshToken, cerr := auth.MintRefreshToken(a, user.ID.String())
-		if cerr != nil {
-			utils.RespondWithError(w, 500, "Internal Server Error")
-		}
-		resUser.AccessToken = token
-		resUser.CreatedAt = user.CreatedAt
-		resUser.UpdatedAt = user.UpdatedAt
-		resUser.Email = user.Email
-		resUser.ID = user.ID
-		resUser.RefreshToken = refreshToken
+		resUser, err := auth.FromDBUserToLoginResUser(a, userReqParams)
 		// Handle user or database error
 		if err != nil {
 			utils.RespondWithError(w, 401, "Unauthorized")
 			return
 		}
-		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userReqParams.Password)) == nil {
-			utils.RespondWithJSON(w, 200, user)
-		}
-		utils.RespondWithJSON(w, 200, user)
+		utils.RespondWithJSON(w, 200, resUser)
 	}
 }
 

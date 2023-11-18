@@ -11,7 +11,7 @@ import (
 
 type DBConfig struct {
 	DB  *database.Queries
-	ctx context.Context
+	CTX context.Context
 }
 
 type ErrorResponse struct {

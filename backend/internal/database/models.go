@@ -63,11 +63,14 @@ type Auth struct {
 
 type Dailytask struct {
 	ID          uuid.UUID   `json:"id"`
+	Title       string      `json:"title"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
 	Description string      `json:"description"`
 	DateStart   time.Time   `json:"date_start"`
 	Repetitions interface{} `json:"repetitions"`
+	UserID      uuid.UUID   `json:"user_id"`
+	TagID       uuid.UUID   `json:"tag_id"`
 }
 
 type Tag struct {
@@ -75,16 +78,20 @@ type Tag struct {
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
 }
 
 type Task struct {
 	ID          uuid.UUID   `json:"id"`
+	Title       string      `json:"title"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
 	Description string      `json:"description"`
 	EventStart  time.Time   `json:"event_start"`
 	EventEnd    time.Time   `json:"event_end"`
 	Repetitions interface{} `json:"repetitions"`
+	UserID      uuid.UUID   `json:"user_id"`
+	TagID       uuid.UUID   `json:"tag_id"`
 }
 
 type User struct {

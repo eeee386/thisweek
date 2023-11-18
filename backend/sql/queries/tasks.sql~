@@ -1,0 +1,8 @@
+-- name: AddTask :one
+  INSERT INTO tasks(id, description, event_start, event_end, repetitions)
+  VALUES($1, $2, $3, $4, $5)
+  RETURNING *;
+
+-- name: 
+
+  

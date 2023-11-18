@@ -11,6 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const AccessTokenIssuer = "thisweek-access"
@@ -57,4 +58,84 @@ func ValidateBearerToken(a *utils.DBConfig, bearerToken string) (database.User, 
 		}
 	}
 	return database.User{}, fmt.Errorf("Invalid Token")
+}
+
+
+type LoginReqUser struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResUser struct {
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+}
+
+func FromDBUserToLoginResUser(a *utils.DBConfig, userReqParams LoginReqUser) (LoginResUser, error) {
+	user, err := a.DB.GetUserByEmail(a.CTX, userReqParams.Email)
+	// Handle Not found or other error differently 
+	if err != nil {
+		return LoginResUser{}, nil
+	}
+	if perr := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userReqParams.Password)); perr != nil {
+		return LoginResUser{}, perr
+	} 
+	token, terr := MintAccessToken(a, user.ID.String())
+	if terr != nil {
+		return LoginResUser{}, terr
+	}
+	refreshToken, cerr := MintRefreshToken(a, user.ID.String())
+	if cerr != nil {
+		return LoginResUser{}, cerr
+	}
+	resUser := LoginResUser{}
+	resUser.AccessToken = token
+	resUser.CreatedAt = user.CreatedAt
+	resUser.UpdatedAt = user.UpdatedAt
+	resUser.Email = user.Email
+	resUser.ID = user.ID
+	resUser.RefreshToken = refreshToken
+	return resUser, nil
+}
+
+
+type RegisterReq struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type RegisterRes struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func CreateNewUser(a *utils.DBConfig, registerReq *RegisterReq) (RegisterRes, error) {
+	createUserObject := database.CreateUserParams{}
+	createUserObject.Email = registerReq.Email
+	createUserObject.Password = registerReq.Password
+	timestamp := time.Now()
+	createUserObject.CreatedAt = timestamp
+	createUserObject.UpdatedAt = timestamp
+	pass, perr := bcrypt.GenerateFromPassword([]byte(createUserObject.Password), 8)
+	createUserObject.Password = fmt.Sprintf("%x", pass)
+	if perr != nil {
+		return RegisterRes{}, nil
+	}
+	user, err := a.DB.CreateUser(a.CTX, createUserObject)
+	if err != nil {
+		return RegisterRes{}, err
+	}
+	registerUserRes := RegisterRes{
+		ID:        user.ID.String(),
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}
+	return registerUserRes, nil
 }

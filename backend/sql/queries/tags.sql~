@@ -1,0 +1,14 @@
+-- name: AddTag :one
+  INSERT INTO tags(id, name, created_at, updated_at)
+  VALUES ($1, $2)
+  RETURNING *;
+
+-- name: RenameTag :one
+  UPDATE tags
+   SET name = $2
+  WHERE id = $1
+  RETURNING *;
+
+-- name DeleteTag :exec
+  DELETE FROM tags WHERE id = $1;
+  
