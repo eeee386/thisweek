@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -28,9 +29,9 @@ func errorHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithError(w, 500, "Internal Server Error")
 }
 
-type authedHandler func(*utils.DBConfig, http.ResponseWriter, *http.Request, database.User)
+type authedHandler func(*utils.DBConfig, http.ResponseWriter, *http.Request, *database.User)
 
-func authenticate(a *utils.DBConfig, handler authedHandler) http.HandlerFunc {
+func authenticate(a *utils.DBConfig, handler authedHandler) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bearerToken := r.Header.Get("Authorization")
 		user, err := auth.ValidateBearerToken(a, bearerToken)
@@ -38,11 +39,10 @@ func authenticate(a *utils.DBConfig, handler authedHandler) http.HandlerFunc {
 		if err != nil {
 			utils.RespondWithError(w, 401, "Unauthorized")
 		} else {
-			handler(a, w, r, user)
+			handler(a, w, r, &user)
 		}
 	}
 }
-
 
 func registerHandler(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +83,7 @@ func revokeTokens(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func refreshAccessToken(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user database.User) {
+func refreshAccessToken(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
 	decoder := json.NewDecoder(r.Body)
 	refreshTokenObj := TokenOperationType{}
 	if err := decoder.Decode(&refreshTokenObj); err != nil {
@@ -140,6 +140,22 @@ func login(a *utils.DBConfig) func(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithJSON(w, 200, resUser)
 	}
 }
+
+type GetTagsParams struct {
+	UserId uuid.UUID `json:"user_id"`
+}
+
+func getTags(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	tags, err := a.DB.GetTagsByUserId(a.CTX, user.ID)
+	if err != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	} else {
+		utils.RespondWithJSON(w, 200, tags)
+	}
+}
+
+
 
 func main() {
 	godotenv.Load()
