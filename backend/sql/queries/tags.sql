@@ -8,11 +8,11 @@
 
 -- name: RenameTag :one
   UPDATE tags
-   SET name = $2,
-       created_at = $3
-  WHERE id = $1
+   SET name = $3,
+       updated_at = $4
+  WHERE id = $1 AND user_id = $2
   RETURNING *;
 
 -- name: DeleteTag :exec
-  DELETE FROM tags WHERE id = $1;
+  DELETE FROM tags WHERE id = $1 AND user_id = $2;
   

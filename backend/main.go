@@ -10,6 +10,7 @@ import (
 	"thisweek/backend/internal/auth"
 	"thisweek/backend/internal/database"
 	"thisweek/backend/internal/utils"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -155,7 +156,82 @@ func getTags(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *da
 	}
 }
 
+type TagRequestType struct {
+	Name string `json:"name"`
+}
 
+func renameTag(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	id := chi.URLParam(r, "id")
+	decoder := json.NewDecoder(r.Body)
+	renameBody := TagRequestType{}
+	if err := decoder.Decode(&renameBody); err != nil {
+		utils.RespondWithError(w, 400, "Bad Request")
+		return
+	}
+	uuid, err := uuid.Parse(id)
+	if err != nil {
+		utils.RespondWithError(w, 400, "Bad Request")
+		return
+	}
+	dbObj := database.RenameTagParams{
+		ID:        uuid,
+		Name:      renameBody.Name,
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+	}
+	tag, err := a.DB.RenameTag(a.CTX, dbObj)
+	// handle errors coming from not found, or database error
+	if err != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	utils.RespondWithJSON(w, 200, tag)
+}
+
+func deleteTag(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	idstring := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idstring)
+	if err != nil {
+		utils.RespondWithError(w, 400, "Bad Request")
+		return
+	}
+	dbObj := database.DeleteTagParams{
+		ID:     id,
+		UserID: user.ID,
+	}
+	derr := a.DB.DeleteTag(a.CTX, dbObj)
+	// handle not found, or database error
+	if derr != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	utils.RespondWithJSON(w, 200, "OK")
+	return
+}
+
+func createTag(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	decoder := json.NewDecoder(r.Body)
+	tagBody := TagRequestType{}
+	if err := decoder.Decode(&tagBody); err != nil {
+		utils.RespondWithError(w, 400, "Bad Request")
+		return
+	}
+	timeStamp := time.Now()
+	dbObj := database.AddTagParams{
+		ID: uuid.New(),
+		Name: tagBody.Name,
+		UserID: user.ID,
+		CreatedAt: timeStamp,
+		UpdatedAt: timeStamp,
+	}
+	tag, err := a.DB.AddTag(a.CTX, dbObj)
+	// handle not found or database error
+  if err != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	utils.RespondWithJSON(w, 200, tag)
+}
 
 func main() {
 	godotenv.Load()
@@ -192,6 +268,10 @@ func main() {
 	v1Router.Post("/login", login(&apiCfg))
 	v1Router.Post("/revokeAccessToken", revokeTokens(&apiCfg))
 	v1Router.Post("/refreshAccessToken", authenticate(&apiCfg, refreshAccessToken))
+
+	v1Router.Get("/tags", authenticate(&apiCfg, getTags))
+	v1Router.Put("/tags/{id}", authenticate(&apiCfg, renameTag))
+	v1Router.Delete("/tags/{id}", authenticate(&apiCfg, deleteTag))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", port), r)
 	fmt.Println(err)

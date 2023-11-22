@@ -46,11 +46,16 @@ func (q *Queries) AddTag(ctx context.Context, arg AddTagParams) (Tag, error) {
 }
 
 const deleteTag = `-- name: DeleteTag :exec
-  DELETE FROM tags WHERE id = $1
+  DELETE FROM tags WHERE id = $1 AND user_id = $2
 `
 
-func (q *Queries) DeleteTag(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteTag, id)
+type DeleteTagParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTag, arg.ID, arg.UserID)
 	return err
 }
 
@@ -89,20 +94,26 @@ func (q *Queries) GetTagsByUserId(ctx context.Context, userID uuid.UUID) ([]Tag,
 
 const renameTag = `-- name: RenameTag :one
   UPDATE tags
-   SET name = $2,
-       created_at = $3
-  WHERE id = $1
+   SET name = $3,
+       updated_at = $4
+  WHERE id = $1 AND user_id = $2
   RETURNING id, name, created_at, updated_at, user_id
 `
 
 type RenameTagParams struct {
 	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
 	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (q *Queries) RenameTag(ctx context.Context, arg RenameTagParams) (Tag, error) {
-	row := q.db.QueryRowContext(ctx, renameTag, arg.ID, arg.Name, arg.CreatedAt)
+	row := q.db.QueryRowContext(ctx, renameTag,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.UpdatedAt,
+	)
 	var i Tag
 	err := row.Scan(
 		&i.ID,
