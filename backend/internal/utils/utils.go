@@ -8,6 +8,7 @@ import (
 	"context"
 )
 
+const BaseDateString = "1990-02-12"
 
 type DBConfig struct {
 	DB  *database.Queries

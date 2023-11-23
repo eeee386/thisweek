@@ -8,16 +8,15 @@
 
 -- name: UpdateTask :one
   UPDATE tasks
-  SET title = $2,
-      description = $3,
-      event_start = $4,
-      event_end = $5,
-      repetitions = $6,
-      user_id = $7,
+  SET title = $3,
+      description = $4,
+      event_start = $5,
+      event_end = $6,
+      repetitions = $7,
       tag_id = $8,
       updated_at =$9
-  WHERE id = $1
+  WHERE id = $1 AND user_id = $2
   RETURNING *;
 
 -- name: DeleteTask :exec
-  DELETE FROM tasks * WHERE id = $1;
+  DELETE FROM tasks * WHERE id = $1 AND user_id = $2;

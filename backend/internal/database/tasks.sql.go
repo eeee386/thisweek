@@ -61,11 +61,16 @@ func (q *Queries) AddTask(ctx context.Context, arg AddTaskParams) (Task, error) 
 }
 
 const deleteTask = `-- name: DeleteTask :exec
-  DELETE FROM tasks * WHERE id = $1
+  DELETE FROM tasks * WHERE id = $1 AND user_id = $2
 `
 
-func (q *Queries) DeleteTask(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteTask, id)
+type DeleteTaskParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTask, arg.ID, arg.UserID)
 	return err
 }
 
@@ -109,26 +114,25 @@ func (q *Queries) GetTasksByUserId(ctx context.Context, userID uuid.UUID) ([]Tas
 
 const updateTask = `-- name: UpdateTask :one
   UPDATE tasks
-  SET title = $2,
-      description = $3,
-      event_start = $4,
-      event_end = $5,
-      repetitions = $6,
-      user_id = $7,
+  SET title = $3,
+      description = $4,
+      event_start = $5,
+      event_end = $6,
+      repetitions = $7,
       tag_id = $8,
       updated_at =$9
-  WHERE id = $1
+  WHERE id = $1 AND user_id = $2
   RETURNING id, title, created_at, updated_at, description, event_start, event_end, repetitions, user_id, tag_id
 `
 
 type UpdateTaskParams struct {
 	ID          uuid.UUID   `json:"id"`
+	UserID      uuid.UUID   `json:"user_id"`
 	Title       string      `json:"title"`
 	Description string      `json:"description"`
 	EventStart  time.Time   `json:"event_start"`
 	EventEnd    time.Time   `json:"event_end"`
 	Repetitions interface{} `json:"repetitions"`
-	UserID      uuid.UUID   `json:"user_id"`
 	TagID       uuid.UUID   `json:"tag_id"`
 	UpdatedAt   time.Time   `json:"updated_at"`
 }
@@ -136,12 +140,12 @@ type UpdateTaskParams struct {
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error) {
 	row := q.db.QueryRowContext(ctx, updateTask,
 		arg.ID,
+		arg.UserID,
 		arg.Title,
 		arg.Description,
 		arg.EventStart,
 		arg.EventEnd,
 		arg.Repetitions,
-		arg.UserID,
 		arg.TagID,
 		arg.UpdatedAt,
 	)

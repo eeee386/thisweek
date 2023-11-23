@@ -233,6 +233,121 @@ func createTag(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *
 	utils.RespondWithJSON(w, 200, tag)
 }
 
+func getTasks(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	tasks, err := a.DB.GetTasksByUserId(a.CTX, user.ID)
+	if err != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return 
+	}
+	utils.RespondWithJSON(w, 200, tasks)
+}
+
+type TaskRequestType struct {
+	Title string `json:"title"`
+	Description string `json:"description"`
+	EventStart string `json:"event_start"`
+	EventEnd string `json:"event_end"`
+	Repetitions string `json:"repetitions"`
+	TagID string `json:"tag_id"`
+}
+
+func updateTasks(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	taskReqObj := TaskRequestType{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&taskReqObj); err != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	eventStartTime, eserr := time.Parse(utils.BaseDateString, taskReqObj.EventStart)
+	if eserr != nil {
+		utils.RespondWithError(w, 400, "Event start is not a valid date!")
+		return
+	}
+	eventEndTime, eeerr := time.Parse(utils.BaseDateString, taskReqObj.EventEnd)
+	if eeerr != nil {
+		utils.RespondWithError(w, 400, "Event end is not a valid date!")
+		return
+	}
+  tagId, err:= uuid.Parse(taskReqObj.TagID)
+	if err!= nil {
+		utils.RespondWithError(w, 400, "Invalid Tag ID")
+		return
+	}
+	updateTaskObj := database.UpdateTaskParams{
+		ID: uuid.New(),
+		UserID: user.ID,
+		Title: taskReqObj.Title,
+		EventStart: eventStartTime,
+		EventEnd: eventEndTime,
+		UpdatedAt: time.Now(),
+		Repetitions: taskReqObj.Repetitions,
+		TagID: tagId,
+	}
+	task, err := a.DB.UpdateTask(a.CTX, updateTaskObj)
+	if err != nil {
+		utils.RespondWithJSON(w, 500, "Internal Server Error")
+		return
+	}
+	utils.RespondWithJSON(w, 200, task)
+}
+
+func createTask(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	taskReqObj := TaskRequestType{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&taskReqObj); err != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	eventStartTime, eserr := time.Parse(utils.BaseDateString, taskReqObj.EventStart)
+	if eserr != nil {
+		utils.RespondWithError(w, 400, "Event start is not a valid date!")
+		return
+	}
+	eventEndTime, eeerr := time.Parse(utils.BaseDateString, taskReqObj.EventEnd)
+	if eeerr != nil {
+		utils.RespondWithError(w, 400, "Event end is not a valid date!")
+		return
+	}
+  tagId, err:= uuid.Parse(taskReqObj.TagID)
+	if err!= nil {
+		utils.RespondWithError(w, 400, "Invalid Tag ID")
+		return
+	}
+	timeStamp := time.Now()
+	addTaskObj := database.AddTaskParams{
+		ID: uuid.New(),
+		UserID: user.ID,
+		Title: taskReqObj.Title,
+		EventStart: eventStartTime,
+		EventEnd: eventEndTime,
+		UpdatedAt: timeStamp,
+		CreatedAt: timeStamp,
+		Repetitions: taskReqObj.Repetitions,
+		TagID: tagId,
+	}
+	task, err := a.DB.AddTask(a.CTX, addTaskObj)
+	if err != nil {
+		utils.RespondWithJSON(w, 500, "Internal Server Error")
+		return
+	}
+	utils.RespondWithJSON(w, 200, task)
+}
+
+func deleteTask(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
+	idstring := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idstring)
+	if err != nil {
+		utils.RespondWithError(w, 400, "Invalid id in param")
+		return
+	}
+	derr := a.DB.DeleteTask(a.CTX, database.DeleteTaskParams{UserID: user.ID, ID: id})
+	if derr != nil {
+		utils.RespondWithError(w, 500, "Internal Server Error")
+		return
+	}
+	utils.RespondWithJSON(w, 200, "OK")
+}
+
 func main() {
 	godotenv.Load()
 	port := os.Getenv("PORT")
@@ -272,6 +387,12 @@ func main() {
 	v1Router.Get("/tags", authenticate(&apiCfg, getTags))
 	v1Router.Put("/tags/{id}", authenticate(&apiCfg, renameTag))
 	v1Router.Delete("/tags/{id}", authenticate(&apiCfg, deleteTag))
+	v1Router.Post("/tags", authenticate(&apiCfg, createTag))
+
+	v1Router.Get("/tasks", authenticate(&apiCfg, getTasks))
+	v1Router.Put("/tasks/{id}", authenticate(&apiCfg, updateTasks))
+	v1Router.Delete("/tags/{id}", authenticate(&apiCfg, deleteTask))
+	v1Router.Post("/tags", authenticate(&apiCfg, createTask))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", port), r)
 	fmt.Println(err)
