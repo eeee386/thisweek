@@ -58,11 +58,16 @@ func (q *Queries) AddDailyTask(ctx context.Context, arg AddDailyTaskParams) (Dai
 }
 
 const deleteDailyTask = `-- name: DeleteDailyTask :exec
-  DELETE FROM dailytasks * WHERE id = $1
+  DELETE FROM dailytasks * WHERE id = $1 AND user_id = $2
 `
 
-func (q *Queries) DeleteDailyTask(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteDailyTask, id)
+type DeleteDailyTaskParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteDailyTask(ctx context.Context, arg DeleteDailyTaskParams) error {
+	_, err := q.db.ExecContext(ctx, deleteDailyTask, arg.ID, arg.UserID)
 	return err
 }
 
@@ -105,24 +110,25 @@ func (q *Queries) GetDailyTasksByUserId(ctx context.Context, userID uuid.UUID) (
 
 const updateDailyTask = `-- name: UpdateDailyTask :one
   UPDATE dailytasks
-  SET title = $2,
-      description = $3,
-      date_start = $4,
-      repetitions = $5,
-      user_id = $6,
-      tag_id = $7,
-      updated_at = $8
-  WHERE id = $1
+  SET title = $3,
+      description = $4,
+      date_start = $5,
+      repetitions = $6,
+      user_id = $7,
+      tag_id = $8,
+      updated_at = $9
+  WHERE id = $1 AND user_id =$2
   RETURNING id, title, created_at, updated_at, description, date_start, repetitions, user_id, tag_id
 `
 
 type UpdateDailyTaskParams struct {
 	ID          uuid.UUID   `json:"id"`
+	UserID      uuid.UUID   `json:"user_id"`
 	Title       string      `json:"title"`
 	Description string      `json:"description"`
 	DateStart   time.Time   `json:"date_start"`
 	Repetitions interface{} `json:"repetitions"`
-	UserID      uuid.UUID   `json:"user_id"`
+	UserID_2    uuid.UUID   `json:"user_id_2"`
 	TagID       uuid.UUID   `json:"tag_id"`
 	UpdatedAt   time.Time   `json:"updated_at"`
 }
@@ -130,11 +136,12 @@ type UpdateDailyTaskParams struct {
 func (q *Queries) UpdateDailyTask(ctx context.Context, arg UpdateDailyTaskParams) (Dailytask, error) {
 	row := q.db.QueryRowContext(ctx, updateDailyTask,
 		arg.ID,
+		arg.UserID,
 		arg.Title,
 		arg.Description,
 		arg.DateStart,
 		arg.Repetitions,
-		arg.UserID,
+		arg.UserID_2,
 		arg.TagID,
 		arg.UpdatedAt,
 	)

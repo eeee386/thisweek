@@ -9,15 +9,15 @@ SELECT * FROM dailytasks WHERE user_id = $1;
 
 -- name: UpdateDailyTask :one
   UPDATE dailytasks
-  SET title = $2,
-      description = $3,
-      date_start = $4,
-      repetitions = $5,
-      user_id = $6,
-      tag_id = $7,
-      updated_at = $8
-  WHERE id = $1
+  SET title = $3,
+      description = $4,
+      date_start = $5,
+      repetitions = $6,
+      user_id = $7,
+      tag_id = $8,
+      updated_at = $9
+  WHERE id = $1 AND user_id =$2
   RETURNING *;
 
 -- name: DeleteDailyTask :exec
-  DELETE FROM dailytasks * WHERE id = $1;
+  DELETE FROM dailytasks * WHERE id = $1 AND user_id = $2;
