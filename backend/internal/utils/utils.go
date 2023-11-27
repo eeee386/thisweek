@@ -1,12 +1,12 @@
 package utils
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"net/http"
 	"thisweek/backend/internal/database"
-	"context"
-	"github.com/google/uuid"
 	"time"
 )
 
@@ -48,8 +48,6 @@ func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	}
 }
 
-
-
 type TagRequestType struct {
 	Name string `json:"name"`
 }
@@ -58,6 +56,7 @@ func (req *TagRequestType) ToRenameTag(id string, userId uuid.UUID) (database.Re
 	uuid, err := uuid.Parse(id)
 	if err != nil {
 		return database.RenameTagParams{}, err
+
 	} else {
 		return database.RenameTagParams{
 			ID:        uuid,
@@ -78,8 +77,6 @@ func (req *TagRequestType) ToCreateTag(userId uuid.UUID) database.AddTagParams {
 		UpdatedAt: timeStamp,
 	}
 }
-
-
 
 type TaskRequestType struct {
 	Title       string `json:"title"`
@@ -147,7 +144,6 @@ func (req *TaskRequestType) ToCreateTask(userId uuid.UUID) (database.AddTaskPara
 
 }
 
-
 type DailyTaskRequestType struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -177,7 +173,7 @@ func (req *DailyTaskRequestType) ToUpdateDailyTask(idstring string, userId uuid.
 		UpdatedAt:   time.Now(),
 		Repetitions: req.Repetitions,
 		TagID:       tagId,
-	}, nil	
+	}, nil
 }
 
 func (req *DailyTaskRequestType) ToCreateDailyTask(userId uuid.UUID) (database.AddDailyTaskParams, error) {
@@ -190,11 +186,11 @@ func (req *DailyTaskRequestType) ToCreateDailyTask(userId uuid.UUID) (database.A
 		return database.AddDailyTaskParams{}, fmt.Errorf("Invalid Tag ID")
 	}
 	timeStamp := time.Now()
-	return database.AddTaskParams{
+	return database.AddDailyTaskParams{
 		ID:          uuid.New(),
 		UserID:      userId,
 		Title:       req.Title,
-		EventStart:  dateStartTime,
+		DateStart:   dateStartTime,
 		UpdatedAt:   timeStamp,
 		CreatedAt:   timeStamp,
 		Repetitions: req.Repetitions,

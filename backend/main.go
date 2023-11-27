@@ -10,7 +10,6 @@ import (
 	"thisweek/backend/internal/auth"
 	"thisweek/backend/internal/database"
 	"thisweek/backend/internal/utils"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -18,6 +17,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func readinessHandler(w http.ResponseWriter, r *http.Request) {
@@ -229,13 +229,13 @@ func getTasks(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *d
 
 func updateTasks(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
 	idstring := chi.URLParam(r, "id")
-	taskReqObj := TaskRequestType{}
+	taskReqObj := utils.TaskRequestType{}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&taskReqObj); err != nil {
 		utils.RespondWithError(w, 500, "Internal Server Error")
 		return
 	}
-	updateTaskObj, err := taskReqObj.toUpdateTask(idstring, user.ID)
+	updateTaskObj, err := taskReqObj.ToUpdateTask(idstring, user.ID)
 	if err != nil {
 		utils.RespondWithError(w, 400, err.Error())
 	}
@@ -293,13 +293,14 @@ func getDailyTasks(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, us
 }
 
 func updateDailyTasks(a *utils.DBConfig, w http.ResponseWriter, r *http.Request, user *database.User) {
-	dailyTaskReqObj := DailyTaskRequestType{}
+	idstring := chi.URLParam(r, "id")
+	dailyTaskReqObj := utils.DailyTaskRequestType{}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&dailyTaskReqObj); err != nil {
 		utils.RespondWithError(w, 500, "Internal Server Error")
 		return
 	}
-	updateTaskObj, err := dailyTaskReqObj.toUpdateDailyTask(user.ID)
+	updateTaskObj, err := dailyTaskReqObj.ToUpdateDailyTask(idstring, user.ID)
 	if err != nil {
 		utils.RespondWithError(w, 400, err.Error())
 	}
