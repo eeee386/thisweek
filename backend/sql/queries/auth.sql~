@@ -1,4 +1,0 @@
--- name: AddRefreshToken :one
-INSERT INTO auth(id)
-VALUES ($1)
-RETURNING *;

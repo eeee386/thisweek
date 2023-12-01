@@ -1,3 +1,0 @@
-CREATE TABLE auth(
-  id TEXT PRIMARY KEY
-);
